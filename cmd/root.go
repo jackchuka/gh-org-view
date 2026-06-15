@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/jackchuka/gh-org-view/internal/cache"
@@ -20,6 +21,7 @@ var (
 	flagNoMembers    bool
 	flagJSON         bool
 	flagNoOpen       bool
+	flagOutDir       string
 )
 
 var rootCmd = &cobra.Command{
@@ -43,6 +45,7 @@ func init() {
 	f.BoolVar(&flagNoMembers, "no-members", false, "Skip collecting team members")
 	f.BoolVar(&flagJSON, "json", false, "Print the canonical JSON to stdout; skip HTML render and open")
 	f.BoolVar(&flagNoOpen, "no-open", false, "Skip opening the HTML in a browser")
+	f.StringVar(&flagOutDir, "out-dir", "", "Write index.html + org.json into this directory (implies --no-open; ignored with --json)")
 }
 
 // Execute runs the root command.
@@ -100,7 +103,14 @@ func runRoot(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	if !flagNoOpen {
+	if flagOutDir != "" {
+		if err := render.WriteArtifacts(flagOutDir, html, data); err != nil {
+			return err
+		}
+		htmlPath = filepath.Join(flagOutDir, "index.html")
+	}
+
+	if flagOutDir == "" && !flagNoOpen {
 		if err := openBrowser(htmlPath); err != nil {
 			_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "warning: could not open browser: %v\n", err)
 		}

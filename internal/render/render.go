@@ -5,6 +5,8 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -32,6 +34,23 @@ func HTML(org *github.Org) (string, error) {
 	out = strings.ReplaceAll(out, "__TREE__", renderTree(org))
 	out = strings.ReplaceAll(out, "__DATA__", string(data))
 	return out, nil
+}
+
+// WriteArtifacts exports the rendered explorer (index.html) and the canonical
+// data (org.json) into dir, creating dir if needed. html must be the output of
+// HTML(org); it is passed in to avoid re-rendering.
+func WriteArtifacts(dir, html string, org *github.Org) error {
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(dir, "index.html"), []byte(html), 0o644); err != nil {
+		return err
+	}
+	data, err := json.MarshalIndent(org, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(dir, "org.json"), data, 0o644)
 }
 
 func renderTree(org *github.Org) string {

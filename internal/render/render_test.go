@@ -3,6 +3,7 @@ package render
 import (
 	"encoding/json"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -74,6 +75,28 @@ func TestDataBlobEscapesAngleBrackets(t *testing.T) {
 
 func TestEscaping(t *testing.T) {
 	assert.Equal(t, "a&amp;b&lt;c&gt;d&quot;e", htmlEscape(`a&b<c>d"e`))
+}
+
+func TestWriteArtifacts(t *testing.T) {
+	org := fixture()
+	html, err := HTML(org)
+	require.NoError(t, err)
+	dir := t.TempDir()
+	require.NoError(t, WriteArtifacts(dir, html, org))
+
+	idx, err := os.ReadFile(filepath.Join(dir, "index.html"))
+	require.NoError(t, err)
+	for _, ph := range []string{"__ORG__", "__TS__", "__TREE__", "__DATA__"} {
+		assert.NotContains(t, string(idx), ph)
+	}
+	assert.Equal(t, html, string(idx))
+
+	jb, err := os.ReadFile(filepath.Join(dir, "org.json"))
+	require.NoError(t, err)
+	var got github.Org
+	require.NoError(t, json.Unmarshal(jb, &got))
+	assert.Equal(t, "acme", got.Org)
+	require.Len(t, got.Teams, 2)
 }
 
 // Golden: regenerate with UPDATE_GOLDEN=1 go test ./internal/render/

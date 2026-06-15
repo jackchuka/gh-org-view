@@ -28,6 +28,7 @@ gh org-view <org> --no-codeowners # skip the CODEOWNERS scan (faster on big orgs
 gh org-view <org> --no-members    # skip collecting members
 gh org-view <org> --json          # print canonical JSON to stdout (for jq/scripting)
 gh org-view <org> --no-open       # render but do not open a browser
+gh org-view <org> --out-dir ./site # write index.html + org.json into ./site (for CI/static hosting)
 ```
 
 Artifacts are written to `${TMPDIR:-/tmp}/gh-org-view/`:
