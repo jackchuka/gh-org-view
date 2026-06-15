@@ -42,7 +42,7 @@ func init() {
 	f.BoolVar(&flagNoCodeowners, "no-codeowners", false, "Skip the CODEOWNERS scan (faster)")
 	f.BoolVar(&flagNoMembers, "no-members", false, "Skip collecting team members")
 	f.BoolVar(&flagJSON, "json", false, "Print the canonical JSON to stdout; skip HTML render and open")
-	f.BoolVar(&flagNoOpen, "no-open", false, "Do not open the HTML in a browser")
+	f.BoolVar(&flagNoOpen, "no-open", false, "Skip opening the HTML in a browser")
 }
 
 // Execute runs the root command.
