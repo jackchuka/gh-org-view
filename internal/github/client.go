@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"strings"
 
 	"github.com/cli/go-gh/v2/pkg/api"
@@ -52,15 +51,9 @@ func paginate[T any](c *Client, path string) ([]T, error) {
 			return nil, fmt.Errorf("decode %s: %w", path, err)
 		}
 		all = append(all, page...)
-		next := parseNextLink(resp.Header.Get("Link"))
-		// Convert absolute URL to a relative path (path only, no query) so
-		// go-gh re-adds the host. The stub uses call-count to serve pages.
-		if next != "" {
-			if u, err := url.Parse(next); err == nil && u.IsAbs() {
-				next = strings.TrimPrefix(u.Path, "/")
-			}
-		}
-		path = next
+		// The Link rel="next" URL is absolute; go-gh's restURL passes absolute
+		// URLs through unchanged, so feed it straight back.
+		path = parseNextLink(resp.Header.Get("Link"))
 	}
 	return all, nil
 }

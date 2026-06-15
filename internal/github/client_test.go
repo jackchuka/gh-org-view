@@ -47,7 +47,10 @@ func (s *stubRT) RoundTrip(req *http.Request) (*http.Response, error) {
 	}
 	h := http.Header{}
 	if idx+1 < len(bodies) {
-		h.Set("Link", `<https://api.github.com`+p+`?page=2>; rel="next"`)
+		// Emit the request's own absolute URL as the next link. paginate feeds
+		// it straight back (go-gh passes absolute URLs through), so the stub
+		// serves the next body by call-count for the same key.
+		h.Set("Link", "<"+req.URL.String()+">; rel=\"next\"")
 	}
 	return &http.Response{
 		StatusCode: 200,
