@@ -143,5 +143,3 @@ func permissionOf(r apiRepo) string {
 	}
 }
 
-// replaced by the real implementation in codeowners.go (Task 6)
-func attachCodeowners(c *Client, org *Org) error { return nil }
