@@ -42,3 +42,19 @@ func TestAttachCodeownersOnlyOwnedRepos(t *testing.T) {
 	assert.Equal(t, 1, rt.calls["/repos/acme/api/contents/CODEOWNERS"])
 	assert.Zero(t, rt.calls["/repos/acme/ext/contents/CODEOWNERS"])
 }
+
+func TestAttachCodeownersFallbackLocation(t *testing.T) {
+	org := &Org{
+		Org:   "acme",
+		Teams: []Team{{Slug: "core", Repos: []Repo{{Name: "acme/api", Permission: "maintain"}}}},
+	}
+	// Top-level CODEOWNERS is absent (404); the ".github/CODEOWNERS" fallback
+	// exists. Its "/" must reach the API as a real path separator, not %2F.
+	rt := &stubRT{pages: map[string][]string{
+		"/repos/acme/api/contents/.github/CODEOWNERS": {"/src @acme/core\n"},
+	}}
+	c := testClient(t, rt)
+	require.NoError(t, attachCodeowners(c, org))
+	assert.Equal(t, []string{"/src"}, org.Teams[0].Repos[0].CodeownerPaths)
+	assert.Equal(t, 1, rt.calls["/repos/acme/api/contents/.github/CODEOWNERS"])
+}

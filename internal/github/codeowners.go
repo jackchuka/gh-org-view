@@ -3,7 +3,6 @@ package github
 import (
 	"bufio"
 	"fmt"
-	"net/url"
 	"strings"
 )
 
@@ -50,7 +49,10 @@ func attachCodeowners(c *Client, org *Org) error {
 
 func fetchCodeowners(c *Client, fullName string) (string, bool, error) {
 	for _, loc := range codeownersLocations {
-		path := fmt.Sprintf("repos/%s/contents/%s", fullName, url.PathEscape(loc))
+		// loc is a hardcoded constant; passing it unescaped keeps the "/" in
+		// ".github/CODEOWNERS" as a real path separator (escaping it to %2F
+		// makes GitHub's Contents API 404).
+		path := fmt.Sprintf("repos/%s/contents/%s", fullName, loc)
 		b, ok, err := c.getRaw(path)
 		if err != nil {
 			return "", false, err

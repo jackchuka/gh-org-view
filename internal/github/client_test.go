@@ -30,7 +30,10 @@ func (s *stubRT) RoundTrip(req *http.Request) (*http.Response, error) {
 	if s.calls == nil {
 		s.calls = map[string]int{}
 	}
-	p := req.URL.Path
+	// Use EscapedPath so the key reflects the bytes actually sent on the wire
+	// (e.g. a "/" escaped to %2F would NOT match an unescaped key) — this is
+	// what GitHub's API sees, so over-escaped paths correctly 404 here.
+	p := req.URL.EscapedPath()
 	if req.URL.RawQuery != "" {
 		p += "?" + req.URL.RawQuery
 	}
