@@ -1,6 +1,7 @@
 package render
 
 import (
+	"encoding/json"
 	"os"
 	"strings"
 	"testing"
@@ -36,7 +37,39 @@ func TestHTMLContainsOrgAndTree(t *testing.T) {
 	assert.Contains(t, out, `data-id="web"`) // nested child rendered
 	// Embedded JSON present and HTML-safe (no raw </script breakout).
 	assert.Contains(t, out, `id="data"`)
-	assert.NotContains(t, out, "</script>\n<")
+	// The embedded JSON must not contain a raw "</" sequence that could break
+	// out of its <script> tag. Inspect only the data blob (the template itself
+	// legitimately contains </script> closing tags elsewhere).
+	assert.NotContains(t, dataBlob(t, out), "</")
+}
+
+// dataBlob returns the JSON text embedded in the <script id="data"> element.
+func dataBlob(t *testing.T, out string) string {
+	t.Helper()
+	const open = `id="data">`
+	i := strings.Index(out, open)
+	require.GreaterOrEqual(t, i, 0)
+	rest := out[i+len(open):]
+	j := strings.Index(rest, "</script>")
+	require.GreaterOrEqual(t, j, 0)
+	return rest[:j]
+}
+
+func TestDataBlobEscapesAngleBrackets(t *testing.T) {
+	org := &github.Org{Org: "acme", Teams: []github.Team{
+		{Slug: "x", Name: "</script><b>", Members: []github.Member{}, Repos: []github.Repo{}},
+	}}
+	out, err := HTML(org)
+	require.NoError(t, err)
+	blob := dataBlob(t, out)
+	// No raw angle brackets survive in the embedded JSON, so it cannot break
+	// out of the <script> tag...
+	assert.NotContains(t, blob, "<")
+	assert.NotContains(t, blob, ">")
+	// ...yet the data round-trips back to the original name intact.
+	var got github.Org
+	require.NoError(t, json.Unmarshal([]byte(blob), &got))
+	assert.Equal(t, "</script><b>", got.Teams[0].Name)
 }
 
 func TestEscaping(t *testing.T) {

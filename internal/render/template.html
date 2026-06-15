@@ -303,7 +303,8 @@ body.chart-mode #tree { display: none; }
   </aside>
   <section id="detail"></section>
 </main>
-<script type="application/json" id="data">__DATA__</script><script>
+<script type="application/json" id="data">__DATA__</script>
+<script>
 (function() {
   const data = JSON.parse(document.getElementById('data').textContent);
   const ORG = data.org;
@@ -891,4 +892,6 @@ body.chart-mode #tree { display: none; }
   // ---------- Boot ----------
   applyRoute();
 })();
-</script></body></html>
+</script>
+</body>
+</html>
