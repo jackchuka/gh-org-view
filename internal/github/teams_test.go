@@ -9,7 +9,7 @@ import (
 
 func TestCollectTeamsMembersRepos(t *testing.T) {
 	rt := &stubRT{pages: map[string][]string{
-		"/orgs/acme/teams": {`[{"slug":"core","name":"Core","description":"d","parent":null}]`},
+		"/orgs/acme/teams":              {`[{"slug":"core","name":"Core","description":"d","parent":null}]`},
 		"/orgs/acme/teams/core/members": {`[{"login":"alice"},{"login":"bob"}]`},
 		"/orgs/acme/teams/core/repos": {
 			`[{"full_name":"acme/api","archived":false,"permissions":{"admin":true,"maintain":true,"push":true}},

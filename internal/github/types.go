@@ -25,7 +25,7 @@ type Member struct {
 }
 
 type Repo struct {
-	Name           string   `json:"name"`       // full name, "owner/repo"
+	Name           string   `json:"name"` // full name, "owner/repo"
 	Archived       bool     `json:"archived"`
 	Permission     string   `json:"permission"` // admin|maintain|push|triage|pull
 	CodeownerPaths []string `json:"codeowner_paths,omitempty"`

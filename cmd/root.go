@@ -102,7 +102,7 @@ func runRoot(cmd *cobra.Command, args []string) error {
 
 	if !flagNoOpen {
 		if err := openBrowser(htmlPath); err != nil {
-			fmt.Fprintf(cmd.ErrOrStderr(), "warning: could not open browser: %v\n", err)
+			_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "warning: could not open browser: %v\n", err)
 		}
 	}
 
@@ -127,10 +127,11 @@ func printSummary(w io.Writer, org *github.Org, htmlPath string, fromCache bool)
 	if fromCache {
 		src = "reused from cache"
 	}
-	fmt.Fprintf(w, "\norg-view for %s (%s)\n", org.Org, src)
-	fmt.Fprintf(w, "  teams:                  %d\n", teams)
-	fmt.Fprintf(w, "  owned repos:            %d\n", len(ownedSet))
-	fmt.Fprintf(w, "  member entries:         %d\n", members)
-	fmt.Fprintf(w, "  codeowner attributions: %d\n", attributions)
-	fmt.Fprintf(w, "  html:                   %s\n", htmlPath)
+	_, _ = fmt.Fprintf(w, "\norg-view for %s (%s)\n"+
+		"  teams:                  %d\n"+
+		"  owned repos:            %d\n"+
+		"  member entries:         %d\n"+
+		"  codeowner attributions: %d\n"+
+		"  html:                   %s\n",
+		org.Org, src, teams, len(ownedSet), members, attributions, htmlPath)
 }

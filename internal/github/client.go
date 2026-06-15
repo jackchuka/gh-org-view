@@ -68,7 +68,7 @@ func (c *Client) getRaw(path string) ([]byte, bool, error) {
 		}
 		return nil, false, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	b, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, false, err

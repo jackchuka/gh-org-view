@@ -142,4 +142,3 @@ func permissionOf(r apiRepo) string {
 		return "pull"
 	}
 }
-

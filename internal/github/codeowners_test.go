@@ -16,7 +16,7 @@ func TestParseCodeowners(t *testing.T) {
 no-owners-here
 `
 	got := parseCodeowners(text, "acme")
-	assert.Equal(t, []string{"*", "/api"}, got["core"])     // @alice and @other-org/team ignored
+	assert.Equal(t, []string{"*", "/api"}, got["core"]) // @alice and @other-org/team ignored
 	assert.Equal(t, []string{"/docs"}, got["writers"])
 	assert.NotContains(t, got, "")
 }
