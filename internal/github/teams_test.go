@@ -54,3 +54,23 @@ func roleOf(ms []Member, login string) string {
 	}
 	return ""
 }
+
+func TestGqlPermission(t *testing.T) {
+	cases := map[string]string{
+		"ADMIN":    "admin",
+		"MAINTAIN": "maintain",
+		"WRITE":    "push",
+		"TRIAGE":   "triage",
+		"READ":     "pull",
+		"":         "pull", // unknown/empty falls back to least privilege
+	}
+	for in, want := range cases {
+		assert.Equal(t, want, gqlPermission(in))
+	}
+}
+
+func TestGqlRole(t *testing.T) {
+	assert.Equal(t, "maintainer", gqlRole("MAINTAINER"))
+	assert.Equal(t, "member", gqlRole("MEMBER"))
+	assert.Equal(t, "member", gqlRole(""))
+}

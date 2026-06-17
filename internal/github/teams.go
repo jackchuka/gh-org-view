@@ -128,6 +128,32 @@ func collectRepos(c *Client, org, slug string) ([]Repo, error) {
 	return repos, nil
 }
 
+// gqlPermission maps a GraphQL RepositoryPermission enum to the canonical
+// permission string. The enum is the highest effective permission, so the
+// boolean priority logic of the old REST path is unnecessary here.
+func gqlPermission(p string) string {
+	switch p {
+	case "ADMIN":
+		return "admin"
+	case "MAINTAIN":
+		return "maintain"
+	case "WRITE":
+		return "push"
+	case "TRIAGE":
+		return "triage"
+	default:
+		return "pull"
+	}
+}
+
+// gqlRole maps a GraphQL TeamMemberRole enum to the canonical role string.
+func gqlRole(r string) string {
+	if r == "MAINTAINER" {
+		return "maintainer"
+	}
+	return "member"
+}
+
 func permissionOf(r apiRepo) string {
 	switch {
 	case r.Permissions.Admin:

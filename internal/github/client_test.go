@@ -65,13 +65,12 @@ func (s *stubRT) RoundTrip(req *http.Request) (*http.Response, error) {
 
 func testClient(t *testing.T, rt http.RoundTripper) *Client {
 	t.Helper()
-	rest, err := api.NewRESTClient(api.ClientOptions{
-		Host:      "github.com",
-		AuthToken: "test",
-		Transport: rt,
-	})
+	opts := api.ClientOptions{Host: "github.com", AuthToken: "test", Transport: rt}
+	rest, err := api.NewRESTClient(opts)
 	require.NoError(t, err)
-	return &Client{rest: rest, raw: rest}
+	gql, err := api.NewGraphQLClient(opts)
+	require.NoError(t, err)
+	return &Client{rest: rest, raw: rest, gql: gql}
 }
 
 func TestPaginateConcatenatesPages(t *testing.T) {

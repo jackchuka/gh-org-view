@@ -16,6 +16,7 @@ import (
 type Client struct {
 	rest *api.RESTClient
 	raw  *api.RESTClient
+	gql  *api.GraphQLClient
 }
 
 // NewClient builds a Client using the same auth as `gh` (token + host).
@@ -30,7 +31,11 @@ func NewClient() (*Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Client{rest: rest, raw: raw}, nil
+	gql, err := api.NewGraphQLClient(api.ClientOptions{})
+	if err != nil {
+		return nil, err
+	}
+	return &Client{rest: rest, raw: raw, gql: gql}, nil
 }
 
 // paginate GETs every page of a list endpoint, following Link rel="next".
