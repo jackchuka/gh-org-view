@@ -633,6 +633,27 @@ body.chart-mode #tree { display: none; }
       `<a class="chip" data-go-kind="team" data-go-id="${esc(c.slug)}">${I.people}${esc(c.name)}</a>`).join('');
     const maint = ms.filter(m => m.role === 'maintainer').length;
 
+    // Distinct members reachable through subteams, with the subteam(s) each belongs to.
+    const viaSub = {}; // login -> Set of subteam slugs
+    (function walk(slug) {
+      for (const c of (teamChildren[slug] || [])) {
+        for (const m of memberList(c)) (viaSub[m.login] || (viaSub[m.login] = new Set())).add(c.slug);
+        walk(c.slug);
+      }
+    })(t.slug);
+    const childLogins = Object.keys(viaSub).sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+    const childMembers = childLogins.map(login => {
+      const labels = [...viaSub[login]]
+        .map(s => teamBySlug[s] ? teamBySlug[s].name : s)
+        .sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()))
+        .map(n => `<span class="path">${esc(n)}</span>`).join('');
+      return `<div class="member" data-go-kind="user" data-go-id="${esc(login)}">
+        <img loading="lazy" src="${esc(avatarUrl(login, 36))}" alt="">
+        <span class="m-name">${esc(login)}</span>
+        <span class="paths">${labels}</span>
+      </div>`;
+    }).join('');
+
     detail.innerHTML = `<div class="detail">${crumb}
       ${detailHead({ title: t.name, gh: ghUrl('team', t.slug), icon: I.people,
         sub: `${esc(t.description || 'No description')} &middot; ${ms.length} member${ms.length===1?'':'s'}${maint?` (${maint} maintainer${maint===1?'':'s'})`:''} &middot; ${(t.repos||[]).length} repo${(t.repos||[]).length===1?'':'s'}` })}
@@ -640,6 +661,10 @@ body.chart-mode #tree { display: none; }
         <div class="label">${I.people}<span>Members</span> <span class="n">${ms.length}</span></div>
         <div class="members">${members || '<span class="empty">none</span>'}</div>
       </div>
+      ${childMembers ? `<div class="section">
+        <div class="label">${I.people}<span>Members via subteams</span> <span class="n">${childLogins.length}</span></div>
+        <div class="members">${childMembers}</div>
+      </div>` : ''}
       <div class="section">
         <div class="label">${I.repo}<span>Repositories</span> <span class="n">${(t.repos||[]).length}</span></div>
         <table class="repo-table">

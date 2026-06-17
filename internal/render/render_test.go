@@ -77,6 +77,34 @@ func TestEscaping(t *testing.T) {
 	assert.Equal(t, "a&amp;b&lt;c&gt;d&quot;e", htmlEscape(`a&b<c>d"e`))
 }
 
+func TestSidebarShowsChildMemberCount(t *testing.T) {
+	parent := "core"
+	org := &github.Org{Org: "acme", Teams: []github.Team{
+		{Slug: "core", Name: "Core", Members: []github.Member{{Login: "alice", Role: "maintainer"}}, Repos: []github.Repo{}},
+		{Slug: "web", Name: "Web", Parent: &parent,
+			Members: []github.Member{{Login: "bob", Role: "member"}, {Login: "carol", Role: "member"}}, Repos: []github.Repo{}},
+	}}
+	out, err := HTML(org)
+	require.NoError(t, err)
+	// core: 1 direct member + 2 distinct via its subteam "web" -> badge "1+2".
+	assert.Contains(t, out, "1+2")
+	assert.Contains(t, out, "1 direct + 2 via subteams")
+}
+
+func TestDescendantMemberCountDedupes(t *testing.T) {
+	parent := "core"
+	gp := "web" // grandchild's parent
+	children := map[string][]github.Team{
+		"core": {{Slug: "web", Name: "Web", Parent: &parent,
+			Members: []github.Member{{Login: "bob"}, {Login: "carol"}}}},
+		"web": {{Slug: "web-ui", Name: "Web UI", Parent: &gp,
+			Members: []github.Member{{Login: "carol"}, {Login: "dave"}}}}, // carol overlaps
+	}
+	// distinct across web + web-ui = bob, carol, dave = 3
+	assert.Equal(t, 3, descendantMemberCount("core", children))
+	assert.Equal(t, 0, descendantMemberCount("web-ui", children))
+}
+
 func TestWriteArtifacts(t *testing.T) {
 	org := fixture()
 	html, err := HTML(org)
