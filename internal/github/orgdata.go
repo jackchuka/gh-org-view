@@ -1,6 +1,9 @@
 package github
 
-import "sort"
+import (
+	"sort"
+	"strings"
+)
 
 const orgReposQuery = `query($org: String!, $cursor: String) {
 	organization(login: $org) {
@@ -96,4 +99,55 @@ func orgRoleValue(r string) string {
 		return "admin"
 	}
 	return "member"
+}
+
+const collaboratorsQuery = `query($owner: String!, $name: String!, $cursor: String) {
+	repository(owner: $owner, name: $name) {
+		collaborators(affiliation: DIRECT, first: 100, after: $cursor) {
+			pageInfo { hasNextPage endCursor }
+			edges { permission node { login } }
+		}
+	}
+}`
+
+// fetchCollaborators returns the DIRECT collaborators of one repo (sorted by
+// login). Repos where the viewer cannot read collaborators resolve the field to
+// null and yield an empty slice rather than an error, so one inaccessible repo
+// never aborts collection.
+func fetchCollaborators(c *Client, org, fullName string) ([]Collaborator, error) {
+	owner, name, ok := strings.Cut(fullName, "/")
+	if !ok {
+		owner, name = org, fullName
+	}
+	var out []Collaborator
+	cursor := ""
+	for {
+		var resp struct {
+			Repository struct {
+				Collaborators struct {
+					PageInfo gqlPageInfo `json:"pageInfo"`
+					Edges    []struct {
+						Permission string `json:"permission"`
+						Node       struct {
+							Login string `json:"login"`
+						} `json:"node"`
+					} `json:"edges"`
+				} `json:"collaborators"`
+			} `json:"repository"`
+		}
+		vars := map[string]interface{}{"owner": owner, "name": name, "cursor": cursor}
+		if err := c.gql.Do(collaboratorsQuery, vars, &resp); err != nil {
+			return nil, mapAuthError(err)
+		}
+		for _, e := range resp.Repository.Collaborators.Edges {
+			out = append(out, Collaborator{Login: e.Node.Login, Permission: gqlPermission(e.Permission)})
+		}
+		pi := resp.Repository.Collaborators.PageInfo
+		if !pi.HasNextPage || pi.EndCursor == "" {
+			break
+		}
+		cursor = pi.EndCursor
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Login < out[j].Login })
+	return out, nil
 }

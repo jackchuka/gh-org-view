@@ -87,3 +87,29 @@ func TestCollectMembersPaginates(t *testing.T) {
 	assert.Equal(t, "bob", members[1].Login)
 	assert.Equal(t, "member", members[1].Role)
 }
+
+func TestFetchCollaboratorsPaginatesAndSorts(t *testing.T) {
+	s := &orgStub{responses: map[string]string{
+		"collab:api:": `{"repository":{"collaborators":{
+			"pageInfo":{"hasNextPage":true,"endCursor":"C1"},
+			"edges":[{"permission":"WRITE","node":{"login":"zoe"}}]}}}`,
+		"collab:api:C1": `{"repository":{"collaborators":{
+			"pageInfo":{"hasNextPage":false,"endCursor":""},
+			"edges":[{"permission":"ADMIN","node":{"login":"amy"}}]}}}`,
+	}}
+	cols, err := fetchCollaborators(orgTestClient(t, s), "acme", "acme/api")
+	require.NoError(t, err)
+	require.Len(t, cols, 2)
+	assert.Equal(t, "amy", cols[0].Login) // sorted by login
+	assert.Equal(t, "admin", cols[0].Permission)
+	assert.Equal(t, "zoe", cols[1].Login)
+	assert.Equal(t, "push", cols[1].Permission)
+}
+
+func TestFetchCollaboratorsInaccessibleIsEmpty(t *testing.T) {
+	// No matching response -> field resolves to null -> empty, not an error.
+	s := &orgStub{responses: map[string]string{}}
+	cols, err := fetchCollaborators(orgTestClient(t, s), "acme", "acme/secret")
+	require.NoError(t, err)
+	assert.Empty(t, cols)
+}
