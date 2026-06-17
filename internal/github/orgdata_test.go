@@ -113,3 +113,17 @@ func TestFetchCollaboratorsInaccessibleIsEmpty(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, cols)
 }
+
+func TestAttachCollaboratorsFillsInPlace(t *testing.T) {
+	s := &orgStub{responses: map[string]string{
+		"collab:api:": `{"repository":{"collaborators":{
+			"pageInfo":{"hasNextPage":false,"endCursor":""},
+			"edges":[{"permission":"ADMIN","node":{"login":"amy"}}]}}}`,
+		// acme/web has no stub -> empty collaborators, no error.
+	}}
+	repos := []OrgRepo{{Name: "acme/api"}, {Name: "acme/web"}}
+	require.NoError(t, attachCollaborators(orgTestClient(t, s), "acme", repos))
+	require.Len(t, repos[0].Collaborators, 1)
+	assert.Equal(t, "amy", repos[0].Collaborators[0].Login)
+	assert.Empty(t, repos[1].Collaborators)
+}

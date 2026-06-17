@@ -151,3 +151,15 @@ func fetchCollaborators(c *Client, org, fullName string) ([]Collaborator, error)
 	sort.Slice(out, func(i, j int) bool { return out[i].Login < out[j].Login })
 	return out, nil
 }
+
+// attachCollaborators fills each repo's Collaborators via the worker pool.
+func attachCollaborators(c *Client, org string, repos []OrgRepo) error {
+	return forEachConcurrent(repos, defaultWorkers, func(i int, r OrgRepo) error {
+		cols, err := fetchCollaborators(c, org, r.Name)
+		if err != nil {
+			return err
+		}
+		repos[i].Collaborators = cols
+		return nil
+	})
+}
