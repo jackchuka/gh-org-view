@@ -35,3 +35,29 @@ func TestOrgMarshalEmptySlicesNotNull(t *testing.T) {
 	assert.Contains(t, string(b), `"repos":[]`)
 	assert.NotContains(t, string(b), `"codeowner_paths"`) // omitempty
 }
+
+func TestOrgRepoAndMemberJSONRoundTrip(t *testing.T) {
+	in := &Org{
+		Org:         "acme",
+		CollectedAt: "2026-06-18T00:00:00Z",
+		Teams:       []Team{},
+		Repos: []OrgRepo{{
+			Name: "acme/api", Archived: true, Fork: false,
+			Collaborators: []Collaborator{{Login: "carol", Permission: "admin"}},
+		}},
+		Members: []OrgMember{{Login: "alice", Role: "admin"}, {Login: "bob", Role: "member"}},
+	}
+	b, err := json.Marshal(in)
+	require.NoError(t, err)
+
+	var out Org
+	require.NoError(t, json.Unmarshal(b, &out))
+	require.Len(t, out.Repos, 1)
+	assert.Equal(t, "acme/api", out.Repos[0].Name)
+	assert.True(t, out.Repos[0].Archived)
+	require.Len(t, out.Repos[0].Collaborators, 1)
+	assert.Equal(t, "carol", out.Repos[0].Collaborators[0].Login)
+	assert.Equal(t, "admin", out.Repos[0].Collaborators[0].Permission)
+	require.Len(t, out.Members, 2)
+	assert.Equal(t, "admin", out.Members[0].Role)
+}
