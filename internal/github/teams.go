@@ -197,7 +197,7 @@ func drainMembers(c *Client, org, slug, cursor string) ([]Member, error) {
 		for _, e := range m.Edges {
 			out = append(out, Member{Login: e.Node.Login, Role: gqlRole(e.Role)})
 		}
-		if !m.PageInfo.HasNextPage {
+		if !m.PageInfo.HasNextPage || m.PageInfo.EndCursor == "" {
 			break
 		}
 		cursor = m.PageInfo.EndCursor
@@ -236,7 +236,7 @@ func drainRepos(c *Client, org, slug, cursor string) ([]Repo, error) {
 				Permission: gqlPermission(e.Permission),
 			})
 		}
-		if !r.PageInfo.HasNextPage {
+		if !r.PageInfo.HasNextPage || r.PageInfo.EndCursor == "" {
 			break
 		}
 		cursor = r.PageInfo.EndCursor
