@@ -120,7 +120,7 @@ func fetchCollaborators(c *Client, org, fullName string) ([]Collaborator, error)
 		owner, name = org, fullName
 	}
 	var out []Collaborator
-	cursor := ""
+	var cursor interface{} // nil on first page; GitHub rejects empty string for collaborators.after
 	for {
 		var resp struct {
 			Repository struct {
@@ -146,7 +146,7 @@ func fetchCollaborators(c *Client, org, fullName string) ([]Collaborator, error)
 		if !pi.HasNextPage || pi.EndCursor == "" {
 			break
 		}
-		cursor = pi.EndCursor
+		cursor = pi.EndCursor // non-empty string is valid for subsequent pages
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Login < out[j].Login })
 	return out, nil

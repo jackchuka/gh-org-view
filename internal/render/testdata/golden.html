@@ -303,7 +303,7 @@ body.chart-mode #tree { display: none; }
   </aside>
   <section id="detail"></section>
 </main>
-<script type="application/json" id="data">{"org":"acme","collected_at":"2026-06-15T00:00:00Z","teams":[{"slug":"core","name":"Core","description":"Core team","parent":null,"members":[{"login":"alice","role":"maintainer"}],"repos":[{"name":"acme/api","archived":false,"permission":"admin"}]},{"slug":"web","name":"Web","description":"","parent":"core","members":[],"repos":[]}],"repos":null,"members":null}</script>
+<script type="application/json" id="data">{"org":"acme","collected_at":"2026-06-15T00:00:00Z","teams":[{"slug":"core","name":"Core","description":"Core team","parent":null,"members":[{"login":"alice","role":"maintainer"}],"repos":[{"name":"acme/api","archived":false,"permission":"admin"}]},{"slug":"web","name":"Web","description":"","parent":"core","members":[],"repos":[]}],"repos":[{"name":"acme/api","archived":false,"fork":false},{"name":"acme/orphan","archived":false,"fork":false,"collaborators":[{"login":"dave","permission":"push"}]}],"members":[{"login":"alice","role":"maintainer"},{"login":"dave","role":"member"}]}</script>
 <script>
 (function() {
   const data = JSON.parse(document.getElementById('data').textContent);
@@ -342,11 +342,17 @@ body.chart-mode #tree { display: none; }
   function memberLogins(t) { return memberList(t).map(m => m.login); }
 
   // ---------- Indexes ----------
-  // login -> { login, teams: [{slug, role}], repos: { name: bestPerm } }
+  // login -> { login, orgRole, teams: [{slug, role}], repos: { name: bestPerm }, directRepos: { name: perm } }
   const userIndex = {};
+  function ensureUser(login) {
+    return userIndex[login] || (userIndex[login] = { login, orgRole: null, teams: [], repos: {}, directRepos: {} });
+  }
+  for (const m of (data.members || [])) {
+    ensureUser(m.login).orgRole = m.role;
+  }
   for (const t of data.teams) {
     for (const m of memberList(t)) {
-      const u = userIndex[m.login] || (userIndex[m.login] = { login: m.login, teams: [], repos: {} });
+      const u = ensureUser(m.login);
       if (!u.teams.some(x => x.slug === t.slug)) u.teams.push({ slug: t.slug, role: m.role });
       for (const r of (t.repos || [])) {
         const cur = u.repos[r.name];
@@ -354,17 +360,34 @@ body.chart-mode #tree { display: none; }
       }
     }
   }
+  for (const r of (data.repos || [])) {
+    for (const col of (r.collaborators || [])) {
+      ensureUser(col.login).directRepos[r.name] = col.permission;
+    }
+  }
   const users = Object.values(userIndex).sort((a, b) =>
     a.login.toLowerCase().localeCompare(b.login.toLowerCase()));
 
-  // name -> { name, teams: [{slug, permission, paths}], bestPerm }
+  // name -> { name, archived, fork, teams: [{slug, permission, paths}], collaborators: [{login, permission}], bestPerm }
   const repoIndex = {};
+  for (const r of (data.repos || [])) {
+    repoIndex[r.name] = {
+      name: r.name, archived: !!r.archived, fork: !!r.fork,
+      teams: [], collaborators: (r.collaborators || []).slice(), bestPerm: null,
+    };
+  }
   for (const t of data.teams) {
     for (const r of (t.repos || [])) {
-      const ri = repoIndex[r.name] || (repoIndex[r.name] = { name: r.name, teams: [], bestPerm: null, archived: false });
+      const ri = repoIndex[r.name] || (repoIndex[r.name] = { name: r.name, archived: false, fork: false, teams: [], collaborators: [], bestPerm: null });
       ri.teams.push({ slug: t.slug, permission: r.permission, paths: r.codeowner_paths || [] });
       if (r.archived) ri.archived = true;
       if (ri.bestPerm == null || permRank(r.permission) > permRank(ri.bestPerm)) ri.bestPerm = r.permission;
+    }
+  }
+  // Fold direct-collaborator grants into bestPerm so the repo's overall access is accurate.
+  for (const ri of Object.values(repoIndex)) {
+    for (const col of ri.collaborators) {
+      if (ri.bestPerm == null || permRank(col.permission) > permRank(ri.bestPerm)) ri.bestPerm = col.permission;
     }
   }
   const repos = Object.values(repoIndex).sort((a, b) =>
@@ -667,6 +690,13 @@ body.chart-mode #tree { display: none; }
         <td>${repoNameCell(name)}</td>
         <td>${permPill(perm)}</td>
       </tr>`).join('');
+    const directRepos = Object.entries(u.directRepos)
+      .sort((a, b) => permRank(b[1]) - permRank(a[1]) || a[0].localeCompare(b[0]));
+    const directRows = directRepos.map(([name, perm]) =>
+      `<tr data-go-kind="repo" data-go-id="${esc(name)}">
+        <td>${repoNameCell(name)}</td>
+        <td>${permPill(perm)}</td>
+      </tr>`).join('');
     const maintCount = u.teams.filter(x => x.role === 'maintainer').length;
 
     detail.innerHTML = `<div class="detail">
@@ -681,6 +711,13 @@ body.chart-mode #tree { display: none; }
         <table class="repo-table">
           <thead><tr><th>Repo</th><th>Best permission</th></tr></thead>
           <tbody>${rows || '<tr><td colspan="2" class="empty">none</td></tr>'}</tbody>
+        </table>
+      </div>
+      <div class="section">
+        <div class="label">${I.repo}<span>Repos (direct collaborator)</span> <span class="n">${directRepos.length}</span></div>
+        <table class="repo-table">
+          <thead><tr><th>Repo</th><th>Permission</th></tr></thead>
+          <tbody>${directRows || '<tr><td colspan="2" class="empty">none</td></tr>'}</tbody>
         </table>
       </div>
     </div>`;
@@ -717,6 +754,13 @@ body.chart-mode #tree { display: none; }
         <img loading="lazy" src="${esc(avatarUrl(login, 36))}" alt="">
         <span class="m-name">${esc(login)}</span>${maintainerOf.has(login) ? roleBadge('maintainer') : ''}
       </div>`).join('');
+    const collabRows = (r.collaborators || []).slice()
+      .sort((a, b) => permRank(b.permission) - permRank(a.permission) || a.login.localeCompare(b.login))
+      .map(col =>
+        `<div class="member" data-go-kind="user" data-go-id="${esc(col.login)}" title="${esc(col.permission)}">
+          <img loading="lazy" src="${esc(avatarUrl(col.login, 36))}" alt="">
+          <span class="m-name">${esc(col.login)}</span>${permPill(col.permission)}
+        </div>`).join('');
 
     detail.innerHTML = `<div class="detail">
       ${detailHead({ title: shortRepo(name), gh: ghUrl('repo', name), icon: r.archived ? I.archive : I.repo,
@@ -731,6 +775,10 @@ body.chart-mode #tree { display: none; }
       <div class="section">
         <div class="label">${I.people}<span>Effective members</span> <span class="n">${userList.length}</span></div>
         <div class="members">${memberRows || '<span class="empty">none</span>'}</div>
+      </div>
+      <div class="section">
+        <div class="label">${I.people}<span>Direct collaborators</span> <span class="n">${(r.collaborators || []).length}</span></div>
+        <div class="members">${collabRows || '<span class="empty">none</span>'}</div>
       </div>
     </div>`;
   }
