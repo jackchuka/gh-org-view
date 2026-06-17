@@ -10,9 +10,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// stubRT serves canned bodies keyed by URL path (plus query), ignoring host. It
-// sets a Link: next header on the first call to a path then drops it, to
-// exercise pagination. Unknown paths return 404 (so raw fetches behave).
+// stubRT serves canned REST bodies keyed by URL path (plus query), ignoring
+// host, for the raw CODEOWNERS client. Unknown paths return 404. The
+// multi-body / Link-header logic is vestigial — pagination is no longer used.
 type stubRT struct {
 	pages map[string][]string // path -> ordered page bodies
 	calls map[string]int
@@ -42,9 +42,8 @@ func (s *stubRT) RoundTrip(req *http.Request) (*http.Response, error) {
 	}
 	h := http.Header{}
 	if idx+1 < len(bodies) {
-		// Emit the request's own absolute URL as the next link. paginate feeds
-		// it straight back (go-gh passes absolute URLs through), so the stub
-		// serves the next body by call-count for the same key.
+		// Emit the request's own absolute URL as the next link so the stub
+		// advances by call-count for the same key on subsequent requests.
 		h.Set("Link", "<"+req.URL.String()+">; rel=\"next\"")
 	}
 	return &http.Response{

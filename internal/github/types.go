@@ -1,5 +1,6 @@
 // Package github collects an organization's team/member/repo/CODEOWNERS topology
-// from the GitHub REST API into a canonical, JSON-serializable model.
+// from the GitHub GraphQL API (CODEOWNERS file contents via REST) into a
+// canonical, JSON-serializable model.
 package github
 
 // Org is the canonical, hand-editable data model. Its JSON shape matches the
