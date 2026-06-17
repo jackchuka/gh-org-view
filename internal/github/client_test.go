@@ -7,20 +7,12 @@ import (
 	"testing"
 
 	"github.com/cli/go-gh/v2/pkg/api"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestParseNextLink(t *testing.T) {
-	hdr := `<https://api.github.com/x?page=2>; rel="next", <https://api.github.com/x?page=5>; rel="last"`
-	assert.Equal(t, "https://api.github.com/x?page=2", parseNextLink(hdr))
-	assert.Equal(t, "", parseNextLink(`<https://api.github.com/x?page=5>; rel="last"`))
-	assert.Equal(t, "", parseNextLink(""))
-}
-
-// stubRT serves canned bodies keyed by URL path (plus query), ignoring host. It
-// sets a Link: next header on the first call to a path then drops it, to
-// exercise pagination. Unknown paths return 404 (so raw fetches behave).
+// stubRT serves canned REST bodies keyed by URL path (plus query), ignoring
+// host, for the raw CODEOWNERS client. Unknown paths return 404. The
+// multi-body / Link-header logic is vestigial — pagination is no longer used.
 type stubRT struct {
 	pages map[string][]string // path -> ordered page bodies
 	calls map[string]int
@@ -50,9 +42,8 @@ func (s *stubRT) RoundTrip(req *http.Request) (*http.Response, error) {
 	}
 	h := http.Header{}
 	if idx+1 < len(bodies) {
-		// Emit the request's own absolute URL as the next link. paginate feeds
-		// it straight back (go-gh passes absolute URLs through), so the stub
-		// serves the next body by call-count for the same key.
+		// Emit the request's own absolute URL as the next link so the stub
+		// advances by call-count for the same key on subsequent requests.
 		h.Set("Link", "<"+req.URL.String()+">; rel=\"next\"")
 	}
 	return &http.Response{
@@ -65,23 +56,10 @@ func (s *stubRT) RoundTrip(req *http.Request) (*http.Response, error) {
 
 func testClient(t *testing.T, rt http.RoundTripper) *Client {
 	t.Helper()
-	rest, err := api.NewRESTClient(api.ClientOptions{
-		Host:      "github.com",
-		AuthToken: "test",
-		Transport: rt,
-	})
+	opts := api.ClientOptions{Host: "github.com", AuthToken: "test", Transport: rt}
+	rest, err := api.NewRESTClient(opts)
 	require.NoError(t, err)
-	return &Client{rest: rest, raw: rest}
-}
-
-func TestPaginateConcatenatesPages(t *testing.T) {
-	rt := &stubRT{pages: map[string][]string{
-		"/orgs/acme/teams": {`[{"slug":"a"}]`, `[{"slug":"b"}]`},
-	}}
-	c := testClient(t, rt)
-	got, err := paginate[Team](c, "orgs/acme/teams")
+	gql, err := api.NewGraphQLClient(opts)
 	require.NoError(t, err)
-	require.Len(t, got, 2)
-	assert.Equal(t, "a", got[0].Slug)
-	assert.Equal(t, "b", got[1].Slug)
+	return &Client{raw: rest, gql: gql}
 }

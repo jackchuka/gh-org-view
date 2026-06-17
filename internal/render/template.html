@@ -517,9 +517,7 @@ body.chart-mode #tree { display: none; }
     return set;
   }
   function renderChartTeam(t) {
-    const inherited = descendantMembers(t.slug);
-    const direct = memberList(t).filter(m => !inherited.has(m.login));
-    const members = direct.slice()
+    const members = memberList(t).slice()
       .sort((a, b) => (b.role === 'maintainer') - (a.role === 'maintainer') ||
         a.login.toLowerCase().localeCompare(b.login.toLowerCase()))
       .map(m => `<li><span class="h-node user" data-go-kind="user" data-go-id="${esc(m.login)}">
@@ -531,10 +529,11 @@ body.chart-mode #tree { display: none; }
     const hasChildren = !!(members || subs);
     const inner = hasChildren ? `<ul>${members}${subs}</ul>` : '';
     const chev = hasChildren ? `<span class="chev" data-toggle="collapse">&#9662;</span>` : '';
-    const total = memberList(t).length;
-    const countLabel = direct.length === total ? `${total}` : `${direct.length}/${total}`;
+    const directCount = memberList(t).length;
+    const childCount = descendantMembers(t.slug).size;
+    const countLabel = childCount > 0 ? `${directCount}+${childCount}` : `${directCount}`;
     return `<span class="h-node team" data-go-kind="team" data-go-id="${esc(t.slug)}">
-      ${chev}<span class="ic">${I.people}</span>${esc(t.name)}<span class="count" title="direct/total members · repos">${countLabel} &middot; ${(t.repos || []).length}</span>
+      ${chev}<span class="ic">${I.people}</span>${esc(t.name)}<span class="count" title="${directCount} direct + ${childCount} via subteams &middot; ${(t.repos || []).length} repos">${countLabel} &middot; ${(t.repos || []).length}</span>
     </span>${inner}`;
   }
   function renderChart() {
@@ -545,7 +544,7 @@ body.chart-mode #tree { display: none; }
         <button data-chart-action="toggle-all">${chartCollapsed ? 'Expand all' : 'Collapse all'}</button>
         <span class="stat" id="chart-stat"></span>
       </div>
-      <div class="legend">${data.teams.length} teams &middot; members shown under their direct team (subteam members not duplicated upward)</div>
+      <div class="legend">${data.teams.length} teams &middot; direct members shown per team; badge is direct+child (members via subteams)</div>
       <ul class="h-tree">
         <li><span class="h-node org"><span class="chev" data-toggle="collapse">&#9662;</span>${esc(ORG)}</span>
           <ul>${roots}</ul>

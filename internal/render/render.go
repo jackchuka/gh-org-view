@@ -88,7 +88,7 @@ func renderTree(org *github.Org) string {
 			chev = "&#9662;"
 		}
 		counts := `<span class="counts">` +
-			metric(peopleIcon, len(t.Members), "member(s)") +
+			memberMetric(len(t.Members), descendantMemberCount(t.Slug, children)) +
 			metric(repoIcon, len(t.Repos), "repo(s)") + `</span>`
 		b.WriteString(`<div class="tree-row" data-kind="team" data-id="` + htmlEscape(t.Slug) + `">`)
 		b.WriteString(`<span class="chev">` + chev + `</span>`)
@@ -113,6 +113,40 @@ func renderTree(org *github.Org) string {
 		node(r)
 	}
 	return b.String()
+}
+
+// descendantMemberCount returns the number of distinct members reachable
+// through slug's subteams (recursively), so an umbrella team can surface how
+// many people it covers via children even though it holds few direct members.
+func descendantMemberCount(slug string, children map[string][]github.Team) int {
+	seen := map[string]bool{}
+	var walk func(s string)
+	walk = func(s string) {
+		for _, c := range children[s] {
+			for _, m := range c.Members {
+				seen[m.Login] = true
+			}
+			walk(c.Slug)
+		}
+	}
+	walk(slug)
+	return len(seen)
+}
+
+// memberMetric renders the people count as "direct" or "direct+child" (distinct
+// members via subteams), mirroring the chart badge.
+func memberMetric(direct, child int) string {
+	zero := ""
+	if direct == 0 && child == 0 {
+		zero = " zero"
+	}
+	text := fmt.Sprintf("%d", direct)
+	title := fmt.Sprintf("%d direct member(s)", direct)
+	if child > 0 {
+		text = fmt.Sprintf("%d+%d", direct, child)
+		title = fmt.Sprintf("%d direct + %d via subteams", direct, child)
+	}
+	return fmt.Sprintf(`<span class="metric%s" title="%s">%s%s</span>`, zero, title, peopleIcon, text)
 }
 
 func metric(icon string, n int, label string) string {
