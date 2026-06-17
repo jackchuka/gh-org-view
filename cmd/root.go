@@ -139,9 +139,11 @@ func printSummary(w io.Writer, org *github.Org, htmlPath string, fromCache bool)
 	}
 	_, _ = fmt.Fprintf(w, "\norg-view for %s (%s)\n"+
 		"  teams:                  %d\n"+
+		"  repos:                  %d\n"+
 		"  owned repos:            %d\n"+
+		"  members:                %d\n"+
 		"  member entries:         %d\n"+
 		"  codeowner attributions: %d\n"+
 		"  html:                   %s\n",
-		org.Org, src, teams, len(ownedSet), members, attributions, htmlPath)
+		org.Org, src, teams, len(org.Repos), len(ownedSet), len(org.Members), members, attributions, htmlPath)
 }

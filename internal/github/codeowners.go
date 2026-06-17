@@ -21,17 +21,28 @@ func attachCodeowners(c *Client, org *Org) error {
 		}
 	}
 
-	// repo full name -> (team slug -> patterns)
-	attr := map[string]map[string][]string{}
+	names := make([]string, 0, len(owned))
 	for full := range owned {
+		names = append(names, full)
+	}
+	texts := make([]string, len(names))
+	founds := make([]bool, len(names))
+	if err := forEachConcurrent(names, defaultWorkers, func(i int, full string) error {
 		text, ok, err := fetchCodeowners(c, full)
 		if err != nil {
 			return err
 		}
-		if !ok {
-			continue
+		texts[i], founds[i] = text, ok
+		return nil
+	}); err != nil {
+		return err
+	}
+	// repo full name -> (team slug -> patterns)
+	attr := map[string]map[string][]string{}
+	for i, full := range names {
+		if founds[i] {
+			attr[full] = parseCodeowners(texts[i], org.Org)
 		}
-		attr[full] = parseCodeowners(text, org.Org)
 	}
 
 	// Write back onto each team's repos.

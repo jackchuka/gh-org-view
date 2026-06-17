@@ -39,13 +39,23 @@ func (g *gqlStub) RoundTrip(req *http.Request) (*http.Response, error) {
 }
 
 func gqlRouteKey(query string, vars map[string]interface{}) string {
+	cursor, _ := vars["cursor"].(string)
+	switch {
+	case strings.Contains(query, "membersWithRole"):
+		return "orgmembers:" + cursor
+	case strings.Contains(query, "repositories(") && strings.Contains(query, "ownerAffiliations"):
+		return "orgrepos:" + cursor
+	case strings.Contains(query, "collaborators("):
+		name, _ := vars["name"].(string)
+		return "collab:" + name + ":" + cursor
+	}
 	if slug, ok := vars["slug"].(string); ok {
-		cursor, _ := vars["cursor"].(string)
+		c, _ := vars["cursor"].(string)
 		kind := "members"
 		if strings.Contains(query, "repositories(") {
 			kind = "repos"
 		}
-		return kind + ":" + slug + ":" + cursor
+		return kind + ":" + slug + ":" + c
 	}
 	tc, _ := vars["teamCursor"].(string)
 	return "teams:" + tc
@@ -191,4 +201,37 @@ func TestGqlRole(t *testing.T) {
 	assert.Equal(t, "maintainer", gqlRole("MAINTAINER"))
 	assert.Equal(t, "member", gqlRole("MEMBER"))
 	assert.Equal(t, "member", gqlRole(""))
+}
+
+func TestCollectPopulatesOrgReposAndMembers(t *testing.T) {
+	g := &gqlStub{responses: map[string]string{
+		"teams:": `{"organization":{"teams":{
+			"pageInfo":{"hasNextPage":false,"endCursor":""},
+			"nodes":[{"slug":"core","name":"Core","description":"","parentTeam":null,
+				"members":{"pageInfo":{"hasNextPage":false,"endCursor":""},"edges":[]},
+				"repositories":{"pageInfo":{"hasNextPage":false,"endCursor":""},"edges":[]}}]}}}`,
+		"orgrepos:": `{"organization":{"repositories":{
+			"pageInfo":{"hasNextPage":false,"endCursor":""},
+			"nodes":[{"nameWithOwner":"acme/api","isArchived":false,"isFork":false},
+			         {"nameWithOwner":"acme/orphan","isArchived":false,"isFork":false}]}}}`,
+		"orgmembers:": `{"organization":{"membersWithRole":{
+			"pageInfo":{"hasNextPage":false,"endCursor":""},
+			"edges":[{"role":"ADMIN","node":{"login":"alice"}}]}}}`,
+		"collab:api:": `{"repository":{"collaborators":{
+			"pageInfo":{"hasNextPage":false,"endCursor":""},
+			"edges":[{"permission":"WRITE","node":{"login":"dave"}}]}}}`,
+		// acme/orphan: no collab stub -> empty.
+	}}
+	c := gqlTestClient(t, g)
+	org, err := Collect(c, "acme", Options{Members: true, Codeowners: false})
+	require.NoError(t, err)
+	require.Len(t, org.Repos, 2)
+	assert.Equal(t, "acme/api", org.Repos[0].Name)
+	require.Len(t, org.Repos[0].Collaborators, 1)
+	assert.Equal(t, "dave", org.Repos[0].Collaborators[0].Login)
+	assert.Equal(t, "push", org.Repos[0].Collaborators[0].Permission)
+	assert.Empty(t, org.Repos[1].Collaborators)
+	require.Len(t, org.Members, 1)
+	assert.Equal(t, "alice", org.Members[0].Login)
+	assert.Equal(t, "admin", org.Members[0].Role)
 }

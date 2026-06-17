@@ -303,7 +303,7 @@ body.chart-mode #tree { display: none; }
   </aside>
   <section id="detail"></section>
 </main>
-<script type="application/json" id="data">{"org":"acme","collected_at":"2026-06-15T00:00:00Z","teams":[{"slug":"core","name":"Core","description":"Core team","parent":null,"members":[{"login":"alice","role":"maintainer"}],"repos":[{"name":"acme/api","archived":false,"permission":"admin"}]},{"slug":"web","name":"Web","description":"","parent":"core","members":[],"repos":[]}]}</script>
+<script type="application/json" id="data">{"org":"acme","collected_at":"2026-06-15T00:00:00Z","teams":[{"slug":"core","name":"Core","description":"Core team","parent":null,"members":[{"login":"alice","role":"maintainer"}],"repos":[{"name":"acme/api","archived":false,"permission":"admin"}]},{"slug":"web","name":"Web","description":"","parent":"core","members":[],"repos":[]}],"repos":null,"members":null}</script>
 <script>
 (function() {
   const data = JSON.parse(document.getElementById('data').textContent);
