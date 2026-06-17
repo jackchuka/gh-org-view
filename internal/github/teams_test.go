@@ -139,6 +139,40 @@ func roleOf(ms []Member, login string) string {
 	return ""
 }
 
+func TestCollectDrainsMemberAndRepoPages(t *testing.T) {
+	g := &gqlStub{responses: map[string]string{
+		// First teams page: team "big" has more members AND more repos.
+		"teams:": `{"organization":{"teams":{
+			"pageInfo":{"hasNextPage":false,"endCursor":""},
+			"nodes":[{"slug":"big","name":"Big","description":"","parentTeam":null,
+				"members":{"pageInfo":{"hasNextPage":true,"endCursor":"M1"},
+					"edges":[{"role":"MEMBER","node":{"login":"a"}}]},
+				"repositories":{"pageInfo":{"hasNextPage":true,"endCursor":"R1"},
+					"edges":[{"permission":"WRITE","node":{"nameWithOwner":"acme/r1","isArchived":false}}]}
+			}]}}}`,
+		// Member drain page 2 (no further pages).
+		"members:big:M1": `{"organization":{"team":{"members":{
+			"pageInfo":{"hasNextPage":false,"endCursor":""},
+			"edges":[{"role":"MAINTAINER","node":{"login":"b"}}]}}}}`,
+		// Repo drain page 2 (no further pages).
+		"repos:big:R1": `{"organization":{"team":{"repositories":{
+			"pageInfo":{"hasNextPage":false,"endCursor":""},
+			"edges":[{"permission":"READ","node":{"nameWithOwner":"acme/r2","isArchived":true}}]}}}}`,
+	}}
+	c := gqlTestClient(t, g)
+	org, err := Collect(c, "acme", Options{Members: true})
+	require.NoError(t, err)
+	require.Len(t, org.Teams, 1)
+	tm := org.Teams[0]
+	require.Len(t, tm.Members, 2)
+	assert.Equal(t, "member", roleOf(tm.Members, "a"))
+	assert.Equal(t, "maintainer", roleOf(tm.Members, "b"))
+	require.Len(t, tm.Repos, 2)
+	assert.Equal(t, "push", tm.Repos[0].Permission)
+	assert.Equal(t, "acme/r2", tm.Repos[1].Name)
+	assert.True(t, tm.Repos[1].Archived)
+}
+
 func TestGqlPermission(t *testing.T) {
 	cases := map[string]string{
 		"ADMIN":    "admin",

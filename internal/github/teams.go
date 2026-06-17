@@ -118,6 +118,20 @@ func Collect(c *Client, org string, opts Options) (*Org, error) {
 					Permission: gqlPermission(e.Permission),
 				})
 			}
+			if n.Members.PageInfo.HasNextPage {
+				more, err := drainMembers(c, org, n.Slug, n.Members.PageInfo.EndCursor)
+				if err != nil {
+					return nil, err
+				}
+				team.Members = append(team.Members, more...)
+			}
+			if n.Repositories.PageInfo.HasNextPage {
+				more, err := drainRepos(c, org, n.Slug, n.Repositories.PageInfo.EndCursor)
+				if err != nil {
+					return nil, err
+				}
+				team.Repos = append(team.Repos, more...)
+			}
 			result.Teams = append(result.Teams, team)
 		}
 
@@ -133,6 +147,101 @@ func Collect(c *Client, org string, opts Options) (*Org, error) {
 		}
 	}
 	return result, nil
+}
+
+const membersDrainQuery = `query($org: String!, $slug: String!, $cursor: String!) {
+	organization(login: $org) {
+		team(slug: $slug) {
+			members(first: 100, after: $cursor, membership: IMMEDIATE) {
+				pageInfo { hasNextPage endCursor }
+				edges { role node { login } }
+			}
+		}
+	}
+}`
+
+const reposDrainQuery = `query($org: String!, $slug: String!, $cursor: String!) {
+	organization(login: $org) {
+		team(slug: $slug) {
+			repositories(first: 100, after: $cursor) {
+				pageInfo { hasNextPage endCursor }
+				edges { permission node { nameWithOwner isArchived } }
+			}
+		}
+	}
+}`
+
+func drainMembers(c *Client, org, slug, cursor string) ([]Member, error) {
+	var out []Member
+	for cursor != "" {
+		var resp struct {
+			Organization struct {
+				Team struct {
+					Members struct {
+						PageInfo gqlPageInfo `json:"pageInfo"`
+						Edges    []struct {
+							Role string `json:"role"`
+							Node struct {
+								Login string `json:"login"`
+							} `json:"node"`
+						} `json:"edges"`
+					} `json:"members"`
+				} `json:"team"`
+			} `json:"organization"`
+		}
+		vars := map[string]interface{}{"org": org, "slug": slug, "cursor": cursor}
+		if err := c.gql.Do(membersDrainQuery, vars, &resp); err != nil {
+			return nil, mapAuthError(err)
+		}
+		m := resp.Organization.Team.Members
+		for _, e := range m.Edges {
+			out = append(out, Member{Login: e.Node.Login, Role: gqlRole(e.Role)})
+		}
+		if !m.PageInfo.HasNextPage {
+			break
+		}
+		cursor = m.PageInfo.EndCursor
+	}
+	return out, nil
+}
+
+func drainRepos(c *Client, org, slug, cursor string) ([]Repo, error) {
+	var out []Repo
+	for cursor != "" {
+		var resp struct {
+			Organization struct {
+				Team struct {
+					Repositories struct {
+						PageInfo gqlPageInfo `json:"pageInfo"`
+						Edges    []struct {
+							Permission string `json:"permission"`
+							Node       struct {
+								NameWithOwner string `json:"nameWithOwner"`
+								IsArchived    bool   `json:"isArchived"`
+							} `json:"node"`
+						} `json:"edges"`
+					} `json:"repositories"`
+				} `json:"team"`
+			} `json:"organization"`
+		}
+		vars := map[string]interface{}{"org": org, "slug": slug, "cursor": cursor}
+		if err := c.gql.Do(reposDrainQuery, vars, &resp); err != nil {
+			return nil, mapAuthError(err)
+		}
+		r := resp.Organization.Team.Repositories
+		for _, e := range r.Edges {
+			out = append(out, Repo{
+				Name:       e.Node.NameWithOwner,
+				Archived:   e.Node.IsArchived,
+				Permission: gqlPermission(e.Permission),
+			})
+		}
+		if !r.PageInfo.HasNextPage {
+			break
+		}
+		cursor = r.PageInfo.EndCursor
+	}
+	return out, nil
 }
 
 // gqlPermission maps a GraphQL RepositoryPermission enum to the canonical
