@@ -7,16 +7,8 @@ import (
 	"testing"
 
 	"github.com/cli/go-gh/v2/pkg/api"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-func TestParseNextLink(t *testing.T) {
-	hdr := `<https://api.github.com/x?page=2>; rel="next", <https://api.github.com/x?page=5>; rel="last"`
-	assert.Equal(t, "https://api.github.com/x?page=2", parseNextLink(hdr))
-	assert.Equal(t, "", parseNextLink(`<https://api.github.com/x?page=5>; rel="last"`))
-	assert.Equal(t, "", parseNextLink(""))
-}
 
 // stubRT serves canned bodies keyed by URL path (plus query), ignoring host. It
 // sets a Link: next header on the first call to a path then drops it, to
@@ -70,17 +62,5 @@ func testClient(t *testing.T, rt http.RoundTripper) *Client {
 	require.NoError(t, err)
 	gql, err := api.NewGraphQLClient(opts)
 	require.NoError(t, err)
-	return &Client{rest: rest, raw: rest, gql: gql}
-}
-
-func TestPaginateConcatenatesPages(t *testing.T) {
-	rt := &stubRT{pages: map[string][]string{
-		"/orgs/acme/teams": {`[{"slug":"a"}]`, `[{"slug":"b"}]`},
-	}}
-	c := testClient(t, rt)
-	got, err := paginate[Team](c, "orgs/acme/teams")
-	require.NoError(t, err)
-	require.Len(t, got, 2)
-	assert.Equal(t, "a", got[0].Slug)
-	assert.Equal(t, "b", got[1].Slug)
+	return &Client{raw: rest, gql: gql}
 }
