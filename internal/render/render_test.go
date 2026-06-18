@@ -24,6 +24,14 @@ func fixture() *github.Org {
 			{Slug: "web", Name: "Web", Description: "", Parent: &parent,
 				Members: []github.Member{}, Repos: []github.Repo{}},
 		},
+		Repos: []github.OrgRepo{
+			{Name: "acme/api"}, // also a team repo
+			{Name: "acme/orphan", Collaborators: []github.Collaborator{{Login: "dave", Permission: "push"}}},
+		},
+		Members: []github.OrgMember{
+			{Login: "alice", Role: "maintainer"}, // also a team member
+			{Login: "dave", Role: "member"},      // on no team
+		},
 	}
 }
 
@@ -125,6 +133,17 @@ func TestWriteArtifacts(t *testing.T) {
 	require.NoError(t, json.Unmarshal(jb, &got))
 	assert.Equal(t, "acme", got.Org)
 	require.Len(t, got.Teams, 2)
+}
+
+func TestEmbedsOrgWideReposAndMembers(t *testing.T) {
+	out, err := HTML(fixture())
+	require.NoError(t, err)
+	blob := dataBlob(t, out)
+	// Orphan repo (no team grant) and its direct collaborator are present.
+	assert.Contains(t, blob, "acme/orphan")
+	assert.Contains(t, blob, "dave")
+	// Org member on no team is present in members.
+	assert.Contains(t, blob, `"members"`)
 }
 
 // Golden: regenerate with UPDATE_GOLDEN=1 go test ./internal/render/

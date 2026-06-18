@@ -85,7 +85,7 @@ func teamsQuery(includeMembers bool) string {
 // Collect gathers the org's teams, direct members (with role), and repos via a
 // single nested, paginated GraphQL query.
 func Collect(c *Client, org string, opts Options) (*Org, error) {
-	result := &Org{Org: org, CollectedAt: nowUTC(), Teams: []Team{}}
+	result := &Org{Org: org, CollectedAt: nowUTC(), Teams: []Team{}, Repos: []OrgRepo{}, Members: []OrgMember{}}
 	query := teamsQuery(opts.Members)
 	teamCursor := ""
 
@@ -139,6 +139,23 @@ func Collect(c *Client, org string, opts Options) (*Org, error) {
 			break
 		}
 		teamCursor = resp.Organization.Teams.PageInfo.EndCursor
+	}
+
+	repos, err := collectRepos(c, org)
+	if err != nil {
+		return nil, err
+	}
+	if err := attachCollaborators(c, org, repos); err != nil {
+		return nil, err
+	}
+	result.Repos = repos
+
+	if opts.Members {
+		members, err := collectMembers(c, org)
+		if err != nil {
+			return nil, err
+		}
+		result.Members = members
 	}
 
 	if opts.Codeowners {
