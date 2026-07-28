@@ -1,7 +1,8 @@
 # gh-org-view
 
-[![Test](https://github.com/jackchuka/gh-org-view/workflows/Test/badge.svg)](https://github.com/jackchuka/gh-org-view/actions)
-[![Go Report Card](https://goreportcard.com/badge/github.com/jackchuka/gh-org-view)](https://goreportcard.com/report/github.com/jackchuka/gh-org-view)
+[![Test](https://github.com/jackchuka/gh-org-view/actions/workflows/test.yml/badge.svg)](https://github.com/jackchuka/gh-org-view/actions/workflows/test.yml)
+[![Release](https://img.shields.io/github/v/release/jackchuka/gh-org-view?sort=semver)](https://github.com/jackchuka/gh-org-view/releases)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 A GitHub CLI extension that renders an interactive, offline HTML explorer of a
 GitHub organization's teams, members (with roles), owned repositories, and
