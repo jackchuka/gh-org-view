@@ -4,7 +4,7 @@ go 1.26.1
 
 require (
 	github.com/briandowns/spinner v1.23.2
-	github.com/cli/go-gh/v2 v2.16.0
+	github.com/cli/go-gh/v2 v2.16.1
 	github.com/spf13/cobra v1.10.2
 	github.com/stretchr/testify v1.12.1
 )
