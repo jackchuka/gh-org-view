@@ -1,8 +1,11 @@
 package github
 
 import (
+	"errors"
 	"sort"
 	"strings"
+
+	"github.com/cli/go-gh/v2/pkg/api"
 )
 
 const orgReposQuery = `query($org: String!, $cursor: String) {
@@ -111,9 +114,10 @@ const collaboratorsQuery = `query($owner: String!, $name: String!, $cursor: Stri
 }`
 
 // fetchCollaborators returns the DIRECT collaborators of one repo (sorted by
-// login). Repos where the viewer cannot read collaborators resolve the field to
-// null and yield an empty slice rather than an error, so one inaccessible repo
-// never aborts collection.
+// login). Repos where the viewer cannot read collaborators (e.g. a public org
+// the viewer is not a member of) return a FORBIDDEN error on the collaborators
+// path; those yield an empty slice so one inaccessible repo never aborts
+// collection.
 func fetchCollaborators(c *Client, org, fullName string) ([]Collaborator, error) {
 	owner, name, ok := strings.Cut(fullName, "/")
 	if !ok {
@@ -137,6 +141,10 @@ func fetchCollaborators(c *Client, org, fullName string) ([]Collaborator, error)
 		}
 		vars := map[string]interface{}{"owner": owner, "name": name, "cursor": cursor}
 		if err := c.gql.Do(collaboratorsQuery, vars, &resp); err != nil {
+			var gqlErr *api.GraphQLError
+			if errors.As(err, &gqlErr) && gqlErr.Match("FORBIDDEN", "repository.collaborators") {
+				return nil, nil
+			}
 			return nil, mapAuthError(err)
 		}
 		for _, e := range resp.Repository.Collaborators.Edges {
