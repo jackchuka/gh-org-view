@@ -14,7 +14,10 @@ import (
 
 // orgStub routes GraphQL POSTs by which collection they belong to, keyed by a
 // substring of the query and the relevant cursor variable.
-type orgStub struct{ responses map[string]string }
+type orgStub struct {
+	responses map[string]string
+	errors    map[string]string
+}
 
 func (s *orgStub) RoundTrip(req *http.Request) (*http.Response, error) {
 	var b struct {
@@ -38,9 +41,13 @@ func (s *orgStub) RoundTrip(req *http.Request) (*http.Response, error) {
 	if !ok {
 		data = `{}`
 	}
+	payload := `{"data":` + data
+	if e, ok := s.errors[key]; ok {
+		payload += `,"errors":` + e
+	}
 	return &http.Response{
 		StatusCode: 200, Header: http.Header{},
-		Body:    io.NopCloser(strings.NewReader(`{"data":` + data + `}`)),
+		Body:    io.NopCloser(strings.NewReader(payload + `}`)),
 		Request: req,
 	}, nil
 }
@@ -126,4 +133,25 @@ func TestAttachCollaboratorsFillsInPlace(t *testing.T) {
 	require.Len(t, repos[0].Collaborators, 1)
 	assert.Equal(t, "amy", repos[0].Collaborators[0].Login)
 	assert.Empty(t, repos[1].Collaborators)
+}
+
+func TestFetchCollaboratorsForbiddenYieldsEmpty(t *testing.T) {
+	s := &orgStub{
+		responses: map[string]string{"collab:api:": `{"repository":{"collaborators":null}}`},
+		errors: map[string]string{"collab:api:": `[{"type":"FORBIDDEN","path":["repository","collaborators"],
+			"message":"You do not have permission to view repository collaborators."}]`},
+	}
+	cols, err := fetchCollaborators(orgTestClient(t, s), "acme", "acme/api")
+	require.NoError(t, err)
+	assert.Empty(t, cols)
+}
+
+func TestFetchCollaboratorsOtherErrorsPropagate(t *testing.T) {
+	s := &orgStub{
+		responses: map[string]string{"collab:api:": `{"repository":null}`},
+		errors: map[string]string{"collab:api:": `[{"type":"NOT_FOUND","path":["repository"],
+			"message":"Could not resolve to a Repository."}]`},
+	}
+	_, err := fetchCollaborators(orgTestClient(t, s), "acme", "acme/api")
+	require.Error(t, err)
 }
